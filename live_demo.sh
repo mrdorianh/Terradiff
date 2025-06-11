@@ -21,10 +21,18 @@ fi
 BIN="$(dirname "$0")/target/release/terradrift"
 if [[ ! -x "$BIN" ]]; then
   echo "🔧 Building release binary…"
-  cargo build -q -p terradrift --release
+  # Compile with optional provider features when requested via TD_FEATURES env var.
+  FEATURES="${TD_FEATURES:-}"
+  if [[ -n "$FEATURES" ]]; then
+    echo "cargo build --release --features \"$FEATURES\""
+    cargo build -q -p terradrift --release --features "$FEATURES"
+  else
+    echo "cargo build --release (no extra features)"
+    cargo build -q -p terradrift --release
+  fi
 fi
 
-CFG=terradrift.toml
+CFG=${TD_CONFIG:-terradrift.toml}
 if [[ ! -f "$CFG" ]]; then
   echo "❌ $CFG not found in repo root" >&2
   exit 1
