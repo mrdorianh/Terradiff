@@ -13,22 +13,14 @@ use aws_sdk_s3::Client as S3Client;
 
 #[cfg(feature = "gcs")]
 use cloud_storage::{ListRequest, Object};
-#[cfg(feature = "gcs")]
+
 use futures_util::StreamExt;
-#[cfg(feature = "gcs")]
 use uuid::Uuid;
 
-#[cfg(feature = "azure")]
-use azure_storage::clients::ClientBuilder;
 #[cfg(feature = "azure")]
 use azure_storage::prelude::*;
 #[cfg(feature = "azure")]
 use azure_storage_blobs::prelude::*;
-#[cfg(feature = "azure")]
-use uuid::Uuid;
-
-#[allow(unused_imports)]
-use tokio_stream::StreamExt;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {
@@ -237,7 +229,14 @@ impl StateSource for AzureStateSource {
         let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
             .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
 
-        let service = ClientBuilder::new_connection_string(&conn)?;
+        // Parse connection string to obtain account and credentials
+        let cs = azure_storage::ConnectionString::new(&conn)?;
+        let credentials = cs.storage_credentials()?;
+        let account = cs
+            .account_name
+            .ok_or_else(|| anyhow::anyhow!("AccountName missing in connection string"))?;
+
+        let service = ClientBuilder::new(account, credentials);
         let container = service.container_client(&self.container);
 
         let key = match &self.prefix {
@@ -259,7 +258,14 @@ impl StateSource for AzureStateSource {
     async fn list_workspaces(&self) -> Result<Vec<String>> {
         let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
             .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
-        let service = ClientBuilder::new_connection_string(&conn)?;
+
+        let cs = azure_storage::ConnectionString::new(&conn)?;
+        let credentials = cs.storage_credentials()?;
+        let account = cs
+            .account_name
+            .ok_or_else(|| anyhow::anyhow!("AccountName missing in connection string"))?;
+
+        let service = ClientBuilder::new(account, credentials);
         let container = service.container_client(&self.container);
 
         let mut builder = container.list_blobs();
@@ -272,14 +278,13 @@ impl StateSource for AzureStateSource {
         let mut out = Vec::new();
         while let Some(resp) = stream.next().await {
             let page = resp?;
-            for item in page.blobs.blobs() {
-                if let azure_storage_blobs::blob::responses::BlobItem::Blob(b) = item {
-                    if b.name.ends_with(".tfstate") {
-                        let trimmed = b.name.strip_prefix(prefix_str).unwrap_or(&b.name);
-                        if let Some(stem) = trimmed.strip_suffix(".tfstate") {
-                            let name = stem.trim_start_matches('/');
-                            out.push(name.to_string());
-                        }
+            for blob in page.blobs.blobs() {
+                // `blob` is of type `&azure_storage_blobs::container::operations::list_blobs::Blob`
+                if blob.name.ends_with(".tfstate") {
+                    let trimmed = blob.name.strip_prefix(prefix_str).unwrap_or(&blob.name);
+                    if let Some(stem) = trimmed.strip_suffix(".tfstate") {
+                        let name = stem.trim_start_matches('/');
+                        out.push(name.to_string());
                     }
                 }
             }
