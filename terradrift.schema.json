@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terradrift.dev/schema/summary.json",
+  "title": "Terradrift Summary",
+  "type": "object",
+  "required": ["profile", "results"],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Profile name used during run"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["workspace", "drift", "changed_resources", "duration_ms"],
+        "properties": {
+          "workspace": { "type": "string" },
+          "drift": { "type": "boolean" },
+          "changed_resources": { "type": "integer", "minimum": 0 },
+          "duration_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+} 

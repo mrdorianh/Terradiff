@@ -1,54 +1,11 @@
-use std::path::PathBuf;
-
-use anyhow::Result;
-use clap::{Parser, Subcommand};
 use anyhow::Context;
-use crate::config::Config;
 use tokio::runtime::Runtime;
-use crate::orchestrator::{run_profile, WorkspaceResult};
-use crate::sink::post_slack;
+use clap::Parser;
 
-/// Terradrift – Terraform drift detector
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// Activate verbose output (-v, -vv, etc.)
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
-
-    /// Sets a custom config file
-    #[arg(short, long, value_name = "FILE", global = true)]
-    config: Option<PathBuf>,
-
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-    /// Detect drift across workspaces
-    Diff {
-        /// Profile (e.g., prod, staging)
-        #[arg(short, long)]
-        profile: String,
-
-        /// Limit concurrency (defaults to logical CPU cores)
-        #[arg(short = 'j', long)]
-        jobs: Option<usize>,
-    },
-    /// Print build information
-    Version {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-}
-
-mod config;
-mod provider;
-mod terraform;
-mod orchestrator;
-mod sink;
+use terradrift::cli::{Cli, Commands};
+use terradrift::config::Config;
+use terradrift::orchestrator::{run_profile, WorkspaceResult};
+use terradrift::sink::post_slack;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -78,7 +35,12 @@ fn main() -> anyhow::Result<()> {
                 if let Ok(webhook) = std::env::var("SLACK_WEBHOOK_URL") {
                     let drift_count = results.iter().filter(|r| r.drift).count();
                     if drift_count > 0 {
-                        let text = format!("🚨 Terradrift detected drift in {drift_count} workspace(s) for profile *{profile}*.");
+                        let plan_link = std::env::var("PLAN_URL").ok();
+                        let text = if let Some(url) = plan_link {
+                            format!("🚨 Terradrift detected drift in {drift_count} workspace(s) for profile *{profile}*. <{url}|View plan>")
+                        } else {
+                            format!("🚨 Terradrift detected drift in {drift_count} workspace(s) for profile *{profile}*.")
+                        };
                         let _ = post_slack(&webhook, &text).await;
                     }
                 }

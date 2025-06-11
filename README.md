@@ -43,11 +43,16 @@ terradrift diff -p prod -j 8
 See [`terradrift.toml.example`](./terradrift.toml.example) for all supported keys.
 
 ## Slack Alerts
-Set the environment variable before running:
+Set the environment variables before running:
 ```bash
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T000/B000/XXX"
+# Optional: link to a hosted plan diff
+export PLAN_URL="https://artifacts.example.com/latest-plan.html"
 ```
 A 🚨 alert is sent only when drift is found.
+
+## JSON Summary Schema
+Terradrift emits a machine-readable JSON summary to stdout. The schema is published in [`terradrift.schema.json`](./terradrift.schema.json).
 
 ## GitHub Actions
 ```yaml

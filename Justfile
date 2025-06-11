@@ -10,3 +10,6 @@ test:
 
 build-static:
     cross build --release --target x86_64-unknown-linux-musl 
+
+man:
+    cargo run -p terradrift --features man --bin gen-man -- terradrift.1 
