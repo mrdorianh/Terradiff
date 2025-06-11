@@ -132,33 +132,41 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
     let mut reader = SyncIoBridge::new(stdout);
     let mut changed = 0u64;
 
-    {
-        let stream = serde_json::Deserializer::from_reader(&mut reader).into_iter::<Value>();
-        for value in stream {
-            let v = value?;
-            if let Some(arr) = v.get("resource_changes").and_then(|v| v.as_array()) {
-                for rc in arr {
-                    if let Some(actions) = rc
-                        .get("change")
-                        .and_then(|c| c.get("actions"))
-                        .and_then(|a| a.as_array())
-                    {
-                        let only_noop = actions.len() == 1 && actions[0].as_str().unwrap_or("") == "no-op";
-                        if !only_noop {
-                            changed += 1;
-                            // Early terminate once we know drift exists
-                            if changed > 0 {
-                                let _ = child.kill().await;
-                                break;
-                            }
-                        }
+    // Stream-deserialize the JSON events emitted by `terraform plan -json`.
+    let stream = serde_json::Deserializer::from_reader(&mut reader).into_iter::<Value>();
+    for value in stream {
+        let v = value?;
+        if let Some(arr) = v
+            .get("resource_changes")
+            .and_then(|v| v.as_array())
+        {
+            for rc in arr {
+                if let Some(actions) = rc
+                    .get("change")
+                    .and_then(|c| c.get("actions"))
+                    .and_then(|a| a.as_array())
+                {
+                    let only_noop = actions.len() == 1
+                        && actions[0].as_str().unwrap_or("") == "no-op";
+                    if !only_noop {
+                        changed += 1;
                     }
                 }
             }
         }
+
+        // As soon as we detect at least one change we can abort further parsing to
+        // minimise CPU/memory usage. Killing the child process prevents Terraform
+        // from continuing the plan execution which can be expensive for large
+        // states.
+        if changed > 0 {
+            // Ignore potential error if the process already exited.
+            let _ = child.kill().await;
+            break;
+        }
     }
 
-    // Await child exit if still running
+    // Ensure the child process has terminated.
     let status = child.wait().await.unwrap_or_default();
 
     let tf_version = terraform_version(bin).await.unwrap_or_default();

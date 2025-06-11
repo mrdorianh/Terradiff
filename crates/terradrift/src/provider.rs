@@ -22,6 +22,8 @@ use azure_storage::prelude::*;
 use azure_storage_blobs::prelude::*;
 #[cfg(feature = "azure")]
 use azure_storage::clients::ClientBuilder;
+#[cfg(feature = "azure")]
+use uuid::Uuid;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {
@@ -278,5 +280,32 @@ impl StateSource for AzureStateSource {
             }
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn mock_source_lists_workspaces() {
+        let dir = tempdir().unwrap();
+        // Create sample tfstate files
+        tokio::fs::write(dir.path().join("ws1.tfstate"), b"{}")
+            .await
+            .unwrap();
+        tokio::fs::write(dir.path().join("ws2.tfstate"), b"{}")
+            .await
+            .unwrap();
+
+        let storage = Storage::Mock {
+            path: dir.path().to_path_buf(),
+        };
+        let src = source_from_storage(&storage).unwrap();
+        let list = src.list_workspaces().await.unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.contains(&"ws1".to_string()));
+        assert!(list.contains(&"ws2".to_string()));
     }
 } 

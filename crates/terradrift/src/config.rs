@@ -67,4 +67,48 @@ fn find_upwards(file_name: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+    use std::io::Write;
+
+    #[test]
+    fn load_config_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let mock_path = dir.path().to_path_buf();
+
+        // Compose minimal TOML configuration
+        let toml = format!(
+            r#"[profiles.prod.storage]
+provider = "mock"
+path = "{}"
+"#, mock_path.display()
+        );
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let cfg = Config::load(Some(file.path().to_path_buf())).unwrap();
+        let profile = cfg.profile("prod").unwrap();
+        match &profile.storage {
+            Storage::Mock { path } => assert_eq!(path, &mock_path),
+            _ => panic!("unexpected storage type"),
+        }
+    }
+
+    #[test]
+    fn missing_profile_errors() {
+        let toml = r#"[profiles.dev.storage]
+provider = "mock"
+path = "/tmp"
+"#;
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+        let cfg = Config::load(Some(file.path().to_path_buf())).unwrap();
+        let result = cfg.profile("does_not_exist");
+        assert!(result.is_err());
+    }
 } 
