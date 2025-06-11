@@ -23,7 +23,8 @@ pub struct Profile {
 #[serde(tag = "provider", rename_all = "lowercase")]
 pub enum Storage {
     Mock { path: PathBuf },
-    // TODO: S3 { bucket: String, prefix: Option<String> },
+    #[cfg(feature = "s3")]
+    S3 { bucket: String, prefix: Option<String> },
     // TODO: Gcs { bucket: String, prefix: Option<String> },
     // TODO: Azure { container: String, prefix: Option<String> },
 }

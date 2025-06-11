@@ -18,10 +18,24 @@ zip = { workspace = true }
 num_cpus = { workspace = true }
 tokio-stream = "0.1"
 futures = "0.3"
+uuid = { version = "1", features = ["v4"], optional = true }
 
 which = "4"
 dirs = "5"
 
 [features]
 default = ["mock"]
-mock = [] 
+mock = []
+s3 = ["aws-sdk-s3", "aws-config", "uuid"]
+
+[dependencies.aws-config]
+version = "1"
+default-features = false
+optional = true
+features = ["rustls"]
+
+[dependencies.aws-sdk-s3]
+version = "1"
+default-features = false
+optional = true
+features = ["rustls"] 

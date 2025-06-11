@@ -6,7 +6,7 @@ use tokio::sync::Semaphore;
 
 use crate::config::Profile;
 use crate::provider::{source_from_storage, StateSource};
-use crate::terraform::{detect_drift_stub, ensure_terraform, DriftReport};
+use crate::terraform::{detect_drift, ensure_terraform};
 
 #[derive(Debug, serde::Serialize)]
 pub struct WorkspaceResult {
@@ -34,7 +34,7 @@ pub async fn run_profile(name: &str, profile: &Profile, jobs: Option<usize>) -> 
         handles.push(tokio::spawn(async move {
             let _p = permit;
             let _state = src.fetch_state(&ws_name).await?; // not used yet
-            let report = detect_drift_stub(&bin_path).await?;
+            let report = detect_drift(&bin_path, &_state).await?;
             Ok::<_, anyhow::Error>(WorkspaceResult {
                 workspace: ws_name,
                 drift: report.drift,
