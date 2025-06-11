@@ -12,4 +12,4 @@ pub async fn post_slack(webhook_url: &str, text: &str) -> Result<()> {
         .error_for_status()
         .with_context(|| "Slack API error")?;
     Ok(())
-} 
+}

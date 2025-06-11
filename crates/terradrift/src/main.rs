@@ -1,13 +1,16 @@
-use tokio::runtime::Runtime;
 use clap::Parser;
+use tokio::runtime::Runtime;
 
 use terradrift::cli::{Cli, Commands};
 use terradrift::config::Config;
 use terradrift::orchestrator::run_profile;
 use terradrift::sink::post_slack;
 
+use tabled::settings::{
+    object::{Columns, Rows},
+    Alignment, Modify, Padding, Style,
+};
 use tabled::{Table, Tabled};
-use tabled::settings::{Style, Modify, Alignment, Padding, object::{Columns, Rows}};
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -109,4 +112,4 @@ fn main() -> anyhow::Result<()> {
         }
         Ok(())
     })
-} 
+}

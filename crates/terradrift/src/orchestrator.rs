@@ -16,7 +16,11 @@ pub struct WorkspaceResult {
     pub duration_ms: u128,
 }
 
-pub async fn run_profile(_profile_name: &str, profile: &Profile, jobs: Option<usize>) -> Result<Vec<WorkspaceResult>> {
+pub async fn run_profile(
+    _profile_name: &str,
+    profile: &Profile,
+    jobs: Option<usize>,
+) -> Result<Vec<WorkspaceResult>> {
     let source = source_from_storage(&profile.storage)?;
     let workspaces = source.list_workspaces().await?;
 
@@ -50,4 +54,4 @@ pub async fn run_profile(_profile_name: &str, profile: &Profile, jobs: Option<us
     }
 
     Ok(results)
-} 
+}

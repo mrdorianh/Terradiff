@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Instant;
 
-use tokio::process::Command;
-use std::io::Read;
 use anyhow::Result;
-use serde_json::{Value};
+use serde_json::Value;
+use std::io::Read;
 use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
 
 const DEFAULT_TERRAFORM_VERSION: &str = "1.7.5";
 
@@ -34,9 +34,7 @@ pub async fn ensure_terraform(version: Option<&str>) -> Result<PathBuf> {
             .to_string_lossy()
             .to_string()
     });
-    let bin_path = Path::new(&cache_root)
-        .join(version)
-        .join("terraform");
+    let bin_path = Path::new(&cache_root).join(version).join("terraform");
     if bin_path.exists() {
         return Ok(bin_path);
     }
@@ -105,7 +103,10 @@ pub async fn terraform_version(bin: &Path) -> Result<String> {
         .wait_with_output()
         .await?;
     let v: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    Ok(v["terraform_version"].as_str().unwrap_or_default().to_string())
+    Ok(v["terraform_version"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string())
 }
 
 /// Stub drift detection – just runs `terraform version` for now.
@@ -143,8 +144,8 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
                     .and_then(|c| c.get("actions"))
                     .and_then(|a| a.as_array())
                 {
-                    let only_noop = actions.len() == 1
-                        && actions[0].as_str().unwrap_or("") == "no-op";
+                    let only_noop =
+                        actions.len() == 1 && actions[0].as_str().unwrap_or("") == "no-op";
                     if !only_noop {
                         changed += 1;
                     }
@@ -169,4 +170,4 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
         duration_ms: start.elapsed().as_millis(),
         terraform_version: tf_version,
     })
-} 
+}

@@ -22,13 +22,24 @@ pub struct Profile {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "provider", rename_all = "lowercase")]
 pub enum Storage {
-    Mock { path: PathBuf },
+    Mock {
+        path: PathBuf,
+    },
     #[cfg(feature = "s3")]
-    S3 { bucket: String, prefix: Option<String> },
+    S3 {
+        bucket: String,
+        prefix: Option<String>,
+    },
     #[cfg(feature = "gcs")]
-    Gcs { bucket: String, prefix: Option<String> },
+    Gcs {
+        bucket: String,
+        prefix: Option<String>,
+    },
     #[cfg(feature = "azure")]
-    Azure { container: String, prefix: Option<String> },
+    Azure {
+        container: String,
+        prefix: Option<String>,
+    },
 }
 
 impl Config {
@@ -48,8 +59,7 @@ impl Config {
     }
 
     pub fn profile(&self, name: &str) -> Result<&Profile> {
-        self
-            .profiles
+        self.profiles
             .get(name)
             .with_context(|| format!("Profile '{}' not found in config", name))
     }
@@ -72,8 +82,8 @@ fn find_upwards(file_name: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn load_config_success() {
@@ -85,7 +95,8 @@ mod tests {
             r#"[profiles.prod.storage]
 provider = "mock"
 path = "{}"
-"#, mock_path.display()
+"#,
+            mock_path.display()
         );
 
         let mut file = NamedTempFile::new().unwrap();
@@ -95,6 +106,7 @@ path = "{}"
         let profile = cfg.profile("prod").unwrap();
         match &profile.storage {
             Storage::Mock { path } => assert_eq!(path, &mock_path),
+            #[cfg(any(feature = "s3", feature = "gcs", feature = "azure"))]
             _ => panic!("unexpected storage type"),
         }
     }
@@ -111,4 +123,4 @@ path = "/tmp"
         let result = cfg.profile("does_not_exist");
         assert!(result.is_err());
     }
-} 
+}

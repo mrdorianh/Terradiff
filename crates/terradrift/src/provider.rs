@@ -7,23 +7,23 @@ use async_trait::async_trait;
 
 use crate::config::Storage;
 #[cfg(feature = "s3")]
-use aws_sdk_s3::Client as S3Client;
-#[cfg(feature = "s3")]
 use aws_config::{self, BehaviorVersion};
+#[cfg(feature = "s3")]
+use aws_sdk_s3::Client as S3Client;
 
 #[cfg(feature = "gcs")]
-use cloud_storage::{Object, ListRequest};
+use cloud_storage::{ListRequest, Object};
 #[cfg(feature = "gcs")]
 use futures_util::StreamExt;
 #[cfg(feature = "gcs")]
 use uuid::Uuid;
 
 #[cfg(feature = "azure")]
+use azure_storage::clients::ClientBuilder;
+#[cfg(feature = "azure")]
 use azure_storage::prelude::*;
 #[cfg(feature = "azure")]
 use azure_storage_blobs::prelude::*;
-#[cfg(feature = "azure")]
-use azure_storage::clients::ClientBuilder;
 #[cfg(feature = "azure")]
 use uuid::Uuid;
 
@@ -40,9 +40,7 @@ pub trait StateSource: Send + Sync {
 
 pub fn source_from_storage(storage: &Storage) -> Result<Box<dyn StateSource>> {
     match storage {
-        Storage::Mock { path } => Ok(Box::new(MockStateSource {
-            root: path.clone(),
-        })),
+        Storage::Mock { path } => Ok(Box::new(MockStateSource { root: path.clone() })),
         #[cfg(feature = "s3")]
         Storage::S3 { bucket, prefix } => Ok(Box::new(S3StateSource {
             bucket: bucket.clone(),
@@ -126,7 +124,8 @@ impl StateSource for S3StateSource {
             .with_context(|| format!("Fetching s3://{}/{}", self.bucket, key))?;
 
         // Write to temp dir
-        let tmp_path = std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
         let bytes = resp.body.collect().await?.into_bytes();
         tokio::fs::write(&tmp_path, &bytes).await?;
         Ok(tmp_path)
@@ -139,10 +138,7 @@ impl StateSource for S3StateSource {
         let mut continuation_token = None;
         let mut out = Vec::new();
         loop {
-            let mut req = client
-                .list_objects_v2()
-                .bucket(&self.bucket)
-                .max_keys(1000);
+            let mut req = client.list_objects_v2().bucket(&self.bucket).max_keys(1000);
             if let Some(ref token) = continuation_token {
                 req = req.continuation_token(token);
             }
@@ -193,8 +189,8 @@ impl StateSource for GcsStateSource {
             .await
             .with_context(|| format!("Downloading gs://{}/{}", self.bucket, obj_name))?;
 
-        let tmp_path = std::env::temp_dir()
-            .join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
         tokio::fs::write(&tmp_path, &bytes).await?;
         Ok(tmp_path)
     }
@@ -202,7 +198,11 @@ impl StateSource for GcsStateSource {
     async fn list_workspaces(&self) -> Result<Vec<String>> {
         let prefix = self.prefix.as_deref().unwrap_or("");
         let req = ListRequest {
-            prefix: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
+            prefix: if prefix.is_empty() {
+                None
+            } else {
+                Some(prefix.to_string())
+            },
             ..Default::default()
         };
         let mut stream = Box::pin(Object::list(&self.bucket, req).await?);
@@ -251,8 +251,8 @@ impl StateSource for AzureStateSource {
             .await
             .with_context(|| format!("Downloading azure://{}/{}", self.container, key))?;
 
-        let tmp_path = std::env::temp_dir()
-            .join(format!("{}_{}.tfstate", _workspace, Uuid::new_v4()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", _workspace, Uuid::new_v4()));
         tokio::fs::write(&tmp_path, bytes).await?;
         Ok(tmp_path)
     }
@@ -313,4 +313,4 @@ mod tests {
         assert!(list.contains(&"ws1".to_string()));
         assert!(list.contains(&"ws2".to_string()));
     }
-} 
+}

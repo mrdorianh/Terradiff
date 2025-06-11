@@ -35,4 +35,4 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
-} 
+}
