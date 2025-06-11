@@ -17,8 +17,9 @@ man:
 demo:
     ./demo.sh 
 
-live:
-    ./live_demo.sh 
+# Run live demo: `just live` (defaults to dev) or `just live prod`
+live PROFILE='dev':
+    bash -c 'if [ "{{PROFILE}}" = "dev" ]; then export TD_CONFIG=terradrift.dev.toml; fi; TD_PROFILE="{{PROFILE}}" ./live_demo.sh'
 
 # Tag & push a signed release (usage: `just release v0.1.0-rc1`)
 release TAG:
