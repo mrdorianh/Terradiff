@@ -87,6 +87,7 @@ just test
 
 Static release build (x86_64-musl):
 ```bash
+# Installs `cross` automatically if not already present
 just build-static
 ```
 

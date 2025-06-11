@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/terradrift",
+    "crates/*",
 ]
 
 [workspace.package]
@@ -25,4 +25,7 @@ zip = "0.6"
 which = "4"
 dirs = "5"
 num_cpus = "1"
-tokio-util = { version = "0.7", features = ["io-util"] } 
+tokio-util = { version = "0.7", features = ["io-util"] }
+jsonwebtoken = "9"
+
+ 

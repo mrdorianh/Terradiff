@@ -9,7 +9,9 @@ test:
     cargo test --all-features
 
 build-static:
-    cross build --release --target x86_64-unknown-linux-musl 
+    # Ensure `cross` is available; install once if missing
+    bash -c 'command -v cross >/dev/null 2>&1 || { echo "⏳ Installing cross..."; cargo install cross --git https://github.com/cross-rs/cross --locked; }'
+    cross build --release --target x86_64-unknown-linux-musl
 
 man:
     cargo run -p terradrift --features man --bin gen-man -- terradrift.1 
