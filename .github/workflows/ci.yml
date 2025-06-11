@@ -58,12 +58,14 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.html
-      - name: Code coverage
-        uses: actions-rs/tarpaulin@v0.1
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
         with:
-          version: "0.32.7"
-          out-type: Xml
-          args: --workspace --ignore-tests
+          tool: "cargo-tarpaulin@0.32.7"
+
+      - name: Generate code coverage (Tarpaulin)
+        run: cargo tarpaulin --workspace --ignore-tests --out Xml
+
       - name: Generate SBOM (cyclonedx)
         run: cargo install cargo-cyclonedx --version ^0.5 && cargo cyclonedx --output sbom.xml
       - name: Sign SBOM with cosign (optional)
