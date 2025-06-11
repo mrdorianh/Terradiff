@@ -1,12 +1,12 @@
 # Terradrift
 
-[![CI](./github/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![CI](https://github.com/yourorg/terradrift/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/terradrift/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](#)
 
 Terraform drift detection at ludicrous speed 🚀
 
-![CLI table screenshot - demo](docs/Screenshot 2025-06-11 at 8.51.54 AM.png)
-![CLI table screenshot - live](docs/Screenshot 2025-06-11 at 8.52.15 AM.png)
+![CLI table screenshot – demo](docs/table-demo.png)
+![CLI table screenshot – live](docs/table-live.png)
 
 ## Features
 - Ultra-fast parallel drift scans (100 workspaces < 60 s)
