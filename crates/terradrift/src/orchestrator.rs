@@ -5,7 +5,7 @@ use futures::future::join_all;
 use tokio::sync::Semaphore;
 
 use crate::config::Profile;
-use crate::provider::{source_from_storage, StateSource};
+use crate::provider::source_from_storage;
 use crate::terraform::{detect_drift, ensure_terraform};
 
 #[derive(Debug, serde::Serialize)]
@@ -16,7 +16,7 @@ pub struct WorkspaceResult {
     pub duration_ms: u128,
 }
 
-pub async fn run_profile(name: &str, profile: &Profile, jobs: Option<usize>) -> Result<Vec<WorkspaceResult>> {
+pub async fn run_profile(_profile_name: &str, profile: &Profile, jobs: Option<usize>) -> Result<Vec<WorkspaceResult>> {
     let source = source_from_storage(&profile.storage)?;
     let workspaces = source.list_workspaces().await?;
 

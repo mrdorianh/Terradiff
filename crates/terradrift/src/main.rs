@@ -1,10 +1,9 @@
-use anyhow::Context;
 use tokio::runtime::Runtime;
 use clap::Parser;
 
 use terradrift::cli::{Cli, Commands};
 use terradrift::config::Config;
-use terradrift::orchestrator::{run_profile, WorkspaceResult};
+use terradrift::orchestrator::run_profile;
 use terradrift::sink::post_slack;
 
 fn main() -> anyhow::Result<()> {

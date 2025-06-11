@@ -1,6 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+#[cfg(any(feature = "s3", feature = "gcs", feature = "azure"))]
+use anyhow::Context;
+use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::config::Storage;
@@ -24,6 +26,9 @@ use azure_storage_blobs::prelude::*;
 use azure_storage::clients::ClientBuilder;
 #[cfg(feature = "azure")]
 use uuid::Uuid;
+
+#[allow(unused_imports)]
+use tokio_stream::StreamExt;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {
@@ -54,6 +59,7 @@ pub fn source_from_storage(storage: &Storage) -> Result<Box<dyn StateSource>> {
             prefix: prefix.clone(),
         })),
         #[cfg(not(any(feature = "s3", feature = "gcs", feature = "azure")))]
+        #[allow(unreachable_patterns)]
         _ => anyhow::bail!("Provider not yet implemented"),
     }
 }
@@ -80,7 +86,6 @@ impl StateSource for MockStateSource {
         let mut list = Vec::new();
         let entries = tokio::fs::read_dir(&self.root).await?;
         tokio::pin!(entries);
-        use tokio_stream::StreamExt;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if let Some(ext) = path.extension() {
