@@ -7,7 +7,7 @@ use tokio::process::Command;
 use std::io::Read;
 use anyhow::Result;
 use serde_json::{Value};
-use tokio_util::io::SyncIoBridge;
+use tokio::io::AsyncBufReadExt;
 
 const DEFAULT_TERRAFORM_VERSION: &str = "1.7.5";
 
@@ -128,18 +128,15 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
     let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
     let stdout = child.stdout.take().expect("child stdout");
 
-    // Bridge async stdout to blocking reader for serde_json
-    let mut reader = SyncIoBridge::new(stdout);
+    let mut reader = tokio::io::BufReader::new(stdout).lines();
     let mut changed = 0u64;
 
-    // Stream-deserialize the JSON events emitted by `terraform plan -json`.
-    let stream = serde_json::Deserializer::from_reader(&mut reader).into_iter::<Value>();
-    for value in stream {
-        let v = value?;
-        if let Some(arr) = v
-            .get("resource_changes")
-            .and_then(|v| v.as_array())
-        {
+    while let Some(line) = reader.next_line().await? {
+        let v: Value = match serde_json::from_str(&line) {
+            Ok(val) => val,
+            Err(_) => continue, // skip invalid fragments
+        };
+        if let Some(arr) = v.get("resource_changes").and_then(|v| v.as_array()) {
             for rc in arr {
                 if let Some(actions) = rc
                     .get("change")
@@ -155,12 +152,7 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
             }
         }
 
-        // As soon as we detect at least one change we can abort further parsing to
-        // minimise CPU/memory usage. Killing the child process prevents Terraform
-        // from continuing the plan execution which can be expensive for large
-        // states.
         if changed > 0 {
-            // Ignore potential error if the process already exited.
             let _ = child.kill().await;
             break;
         }
