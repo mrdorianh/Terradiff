@@ -61,7 +61,8 @@ jobs:
       - name: Code coverage
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: latest
+          version: "0.32.7"
+          out-type: Xml
           args: --workspace --ignore-tests
       - name: Generate SBOM (cyclonedx)
         run: cargo install cargo-cyclonedx --version ^0.5 && cargo cyclonedx --output sbom.xml
