@@ -1,0 +1,21 @@
+# terradrift.toml.example – sample configuration
+
+[profiles.prod]
+# Override the default concurrency for this profile (optional)
+jobs = 16
+
+[profiles.prod.storage]
+# One of: mock | s3 | gcs | azure
+provider = "s3"
+# S3 specifics
+bucket = "my-tfstate-prod"
+prefix = "states"
+
+[profiles.staging.storage]
+provider = "gcs"
+bucket = "tfstate-staging"
+prefix = "terraform/states"
+
+[profiles.dev.storage]
+provider = "mock"
+path = "./tests/fixtures/states" 
