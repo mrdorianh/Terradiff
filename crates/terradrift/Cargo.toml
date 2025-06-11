@@ -18,11 +18,11 @@ zip = { workspace = true }
 num_cpus = { workspace = true }
 tokio-stream = "0.1"
 futures = "0.3"
-uuid = { version = "1", features = ["v4"], optional = true }
 tokio-util = { workspace = true }
-futures-util = { version = "0.3", optional = true }
 owo-colors = "3"
 tabled = { version = "0.15", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
+futures-util = "0.3"
 
 which = "4"
 dirs = "5"
@@ -30,9 +30,9 @@ dirs = "5"
 [features]
 default = ["mock"]
 mock = []
-s3 = ["aws-sdk-s3", "aws-config", "uuid"]
-gcs = ["cloud-storage", "uuid", "futures-util"]
-azure = ["azure_storage", "azure_storage_blobs", "uuid", "futures-util"]
+s3 = ["aws-sdk-s3", "aws-config"]
+azure = ["azure_storage", "azure_storage_blobs"]
+gcs = ["gcp_auth", "percent-encoding"]
 man = ["clap_mangen"]
 
 [dependencies.aws-config]
@@ -47,10 +47,9 @@ default-features = false
 optional = true
 features = ["rustls"]
 
-[dependencies.cloud-storage]
-version = "0.11"
+[dependencies.clap_mangen]
+version = "0.2"
 optional = true
-features = ["global-client"]
 
 [dependencies.azure_storage]
 version = "0.21"
@@ -60,8 +59,12 @@ optional = true
 version = "0.21"
 optional = true
 
-[dependencies.clap_mangen]
-version = "0.2"
+[dependencies.gcp_auth]
+version = "0.12.3"
+optional = true
+
+[dependencies.percent-encoding]
+version = "2"
 optional = true
 
 [dev-dependencies]

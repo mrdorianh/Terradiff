@@ -41,12 +41,16 @@ jobs:
         with:
           name: terradrift-musl
           path: target/x86_64-unknown-linux-musl/release/terradrift
+      - name: Download Trivy HTML template
+        run: |
+          curl -sSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o trivy-html.tpl
       - name: Run Trivy security scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: "fs"
           ignore-unfixed: true
-          format: "html"
+          format: "template"
+          template: "./trivy-html.tpl"
           output: "trivy-report.html"
           input: "target/x86_64-unknown-linux-musl/release/terradrift"
       - name: Upload Trivy report
@@ -54,13 +58,22 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.html
-      - name: Code coverage
-        uses: actions-rs/tarpaulin@v0.1
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
         with:
-          version: latest
-          args: --workspace --ignore-tests
+          tool: "cargo-tarpaulin@0.32.7"
+
+      - name: Generate code coverage (Tarpaulin)
+        run: cargo tarpaulin --workspace --ignore-tests --out Xml
+
       - name: Generate SBOM (cyclonedx)
-        run: cargo install cargo-cyclonedx --version ^0.5 && cargo cyclonedx --output sbom.xml
+        run: |
+          cargo install --locked cargo-cyclonedx --version ^0.5
+          # Generate SBOM in CycloneDX XML format. The tool writes the file next to the
+          # manifest (./crates/terradrift/sbom.xml). Use --override-filename to simplify
+          cargo cyclonedx -f xml --override-filename sbom
+          # Move the generated file to workspace root so later steps can find it
+          mv $(find . -maxdepth 3 -name sbom.xml | head -n 1) ./sbom.xml
       - name: Sign SBOM with cosign (optional)
         continue-on-error: true
         env:

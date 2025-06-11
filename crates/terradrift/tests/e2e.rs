@@ -1,16 +1,16 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
-use tempfile::{tempdir, NamedTempFile};
-use std::io::Write;
 use std::fs;
+use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
+use tempfile::{tempdir, NamedTempFile};
 
 #[test]
 fn drift_exit_code() {
     // Temp dir for mock tfstate files
     let state_dir = tempdir().unwrap();
-    fs::write(state_dir.path().join("ws_clean.tfstate"), b"{}" ).unwrap();
-    fs::write(state_dir.path().join("ws_drift.tfstate"), b"{}" ).unwrap();
+    fs::write(state_dir.path().join("ws_clean.tfstate"), b"{}").unwrap();
+    fs::write(state_dir.path().join("ws_drift.tfstate"), b"{}").unwrap();
 
     // Fake terraform binary that simulates drift
     let bin_dir = tempdir().unwrap();
@@ -22,7 +22,11 @@ fn drift_exit_code() {
     writeln!(script, "exit 0; fi").unwrap();
 
     // For any plan command, emit JSON with a single changed resource and exit 2
-    writeln!(script, "echo '{{\"resource_changes\":[{{\"change\":{{\"actions\":[\"update\"]}}}}]}}'").unwrap();
+    writeln!(
+        script,
+        "echo '{{\"resource_changes\":[{{\"change\":{{\"actions\":[\"update\"]}}}}]}}'"
+    )
+    .unwrap();
     writeln!(script, "exit 2").unwrap();
     drop(script);
     let mut perms = fs::metadata(&bin_path).unwrap().permissions();
@@ -34,20 +38,31 @@ fn drift_exit_code() {
         r#"[profiles.prod.storage]
 provider = "mock"
 path = "{}"
-"#, state_dir.path().display());
+"#,
+        state_dir.path().display()
+    );
     let toml_file = NamedTempFile::new().unwrap();
     fs::write(toml_file.path(), toml_content).unwrap();
 
     // Invoke CLI
     let mut cmd = Command::cargo_bin("terradrift").unwrap();
     cmd.arg("diff")
-        .arg("-p").arg("prod")
-        .arg("--config").arg(toml_file.path())
-        .env("PATH", format!("{}:{}", bin_dir.path().display(), std::env::var("PATH").unwrap_or_default()))
+        .arg("-p")
+        .arg("prod")
+        .arg("--config")
+        .arg(toml_file.path())
+        .env(
+            "PATH",
+            format!(
+                "{}:{}",
+                bin_dir.path().display(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        )
         .env("TERRADRIFT_TF_CACHE", tempdir().unwrap().path());
 
     cmd.assert()
         .failure() // exit code != 0 expected (drift yields 2)
         .code(predicate::eq(2))
         .stdout(predicate::str::contains("\"drift\": true"));
-} 
+}

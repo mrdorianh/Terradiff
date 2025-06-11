@@ -7,28 +7,23 @@ use async_trait::async_trait;
 
 use crate::config::Storage;
 #[cfg(feature = "s3")]
-use aws_sdk_s3::Client as S3Client;
-#[cfg(feature = "s3")]
 use aws_config::{self, BehaviorVersion};
+#[cfg(feature = "s3")]
+use aws_sdk_s3::Client as S3Client;
 
 #[cfg(feature = "gcs")]
-use cloud_storage::{Object, ListRequest};
+use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
 #[cfg(feature = "gcs")]
-use futures_util::StreamExt;
-#[cfg(feature = "gcs")]
-use uuid::Uuid;
+use serde::Deserialize;
 
-#[cfg(feature = "azure")]
-use azure_storage::prelude::*;
 #[cfg(feature = "azure")]
 use azure_storage_blobs::prelude::*;
-#[cfg(feature = "azure")]
-use azure_storage::clients::ClientBuilder;
-#[cfg(feature = "azure")]
-use uuid::Uuid;
 
-#[allow(unused_imports)]
-use tokio_stream::StreamExt;
+#[cfg(feature = "azure")]
+use futures_util::StreamExt;
+
+#[cfg(any(feature = "s3", feature = "gcs"))]
+use uuid::Uuid;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {
@@ -40,9 +35,7 @@ pub trait StateSource: Send + Sync {
 
 pub fn source_from_storage(storage: &Storage) -> Result<Box<dyn StateSource>> {
     match storage {
-        Storage::Mock { path } => Ok(Box::new(MockStateSource {
-            root: path.clone(),
-        })),
+        Storage::Mock { path } => Ok(Box::new(MockStateSource { root: path.clone() })),
         #[cfg(feature = "s3")]
         Storage::S3 { bucket, prefix } => Ok(Box::new(S3StateSource {
             bucket: bucket.clone(),
@@ -126,7 +119,8 @@ impl StateSource for S3StateSource {
             .with_context(|| format!("Fetching s3://{}/{}", self.bucket, key))?;
 
         // Write to temp dir
-        let tmp_path = std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
         let bytes = resp.body.collect().await?.into_bytes();
         tokio::fs::write(&tmp_path, &bytes).await?;
         Ok(tmp_path)
@@ -139,10 +133,7 @@ impl StateSource for S3StateSource {
         let mut continuation_token = None;
         let mut out = Vec::new();
         loop {
-            let mut req = client
-                .list_objects_v2()
-                .bucket(&self.bucket)
-                .max_keys(1000);
+            let mut req = client.list_objects_v2().bucket(&self.bucket).max_keys(1000);
             if let Some(ref token) = continuation_token {
                 req = req.continuation_token(token);
             }
@@ -181,6 +172,21 @@ struct GcsStateSource {
 }
 
 #[cfg(feature = "gcs")]
+#[derive(Deserialize)]
+struct ObjectList {
+    #[serde(default)]
+    items: Vec<Obj>,
+    #[serde(rename = "nextPageToken")]
+    next_page_token: Option<String>,
+}
+
+#[cfg(feature = "gcs")]
+#[derive(Deserialize)]
+struct Obj {
+    name: String,
+}
+
+#[cfg(feature = "gcs")]
 #[async_trait]
 impl StateSource for GcsStateSource {
     async fn fetch_state(&self, workspace: &str) -> Result<PathBuf> {
@@ -189,35 +195,84 @@ impl StateSource for GcsStateSource {
             None => format!("{}.tfstate", workspace),
         };
 
-        let bytes = Object::download(&self.bucket, &obj_name)
-            .await
-            .with_context(|| format!("Downloading gs://{}/{}", self.bucket, obj_name))?;
+        let provider = gcp_auth::provider().await?;
+        let token = provider
+            .token(&["https://www.googleapis.com/auth/devstorage.read_only"])
+            .await?;
 
-        let tmp_path = std::env::temp_dir()
-            .join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
+        let encoded = percent_encode(obj_name.as_bytes(), NON_ALPHANUMERIC).to_string();
+        let url = format!(
+            "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
+            self.bucket, encoded
+        );
+
+        let resp = reqwest::Client::new()
+            .get(&url)
+            .bearer_auth(token.as_str())
+            .send()
+            .await
+            .with_context(|| format!("Downloading gs://{}/{}", self.bucket, obj_name))?
+            .error_for_status()?;
+
+        let bytes = resp.bytes().await?;
+
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", workspace, Uuid::new_v4()));
         tokio::fs::write(&tmp_path, &bytes).await?;
         Ok(tmp_path)
     }
 
     async fn list_workspaces(&self) -> Result<Vec<String>> {
-        let prefix = self.prefix.as_deref().unwrap_or("");
-        let req = ListRequest {
-            prefix: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
-            ..Default::default()
-        };
-        let mut stream = Box::pin(Object::list(&self.bucket, req).await?);
-
         let mut out = Vec::new();
-        while let Some(list_res) = stream.next().await {
-            let list = list_res?;
+        let mut page_token: Option<String> = None;
+
+        let provider = gcp_auth::provider().await?;
+        let token = provider
+            .token(&["https://www.googleapis.com/auth/devstorage.read_only"])
+            .await?;
+        let client = reqwest::Client::new();
+
+        loop {
+            let mut url = format!(
+                "https://storage.googleapis.com/storage/v1/b/{}/o?fields=items(name),nextPageToken",
+                self.bucket
+            );
+            if let Some(ref p) = self.prefix {
+                url.push_str("&prefix=");
+                url.push_str(&percent_encode(p.as_bytes(), NON_ALPHANUMERIC).to_string());
+            }
+            if let Some(ref token_val) = page_token {
+                url.push_str("&pageToken=");
+                url.push_str(token_val);
+            }
+
+            let resp = client
+                .get(&url)
+                .bearer_auth(token.as_str())
+                .send()
+                .await?
+                .error_for_status()?;
+
+            let list: ObjectList = resp.json().await?;
             for obj in list.items {
                 if obj.name.ends_with(".tfstate") {
-                    let name_part = obj.name.strip_prefix(prefix).unwrap_or(&obj.name);
-                    if let Some(stem) = name_part.strip_suffix(".tfstate") {
-                        let trimmed = stem.trim_start_matches('/');
-                        out.push(trimmed.to_string());
+                    let trimmed = if let Some(ref p) = self.prefix {
+                        obj.name
+                            .strip_prefix(&(p.to_owned() + "/"))
+                            .unwrap_or(&obj.name)
+                    } else {
+                        obj.name.as_str()
+                    };
+                    if let Some(stem) = trimmed.strip_suffix(".tfstate") {
+                        out.push(stem.to_string());
                     }
                 }
+            }
+
+            if let Some(token_val) = list.next_page_token {
+                page_token = Some(token_val);
+            } else {
+                break;
             }
         }
         Ok(out)
@@ -237,7 +292,14 @@ impl StateSource for AzureStateSource {
         let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
             .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
 
-        let service = ClientBuilder::new_connection_string(&conn)?;
+        // Parse connection string to obtain account and credentials
+        let cs = azure_storage::ConnectionString::new(&conn)?;
+        let credentials = cs.storage_credentials()?;
+        let account = cs
+            .account_name
+            .ok_or_else(|| anyhow::anyhow!("AccountName missing in connection string"))?;
+
+        let service = ClientBuilder::new(account, credentials);
         let container = service.container_client(&self.container);
 
         let key = match &self.prefix {
@@ -251,15 +313,22 @@ impl StateSource for AzureStateSource {
             .await
             .with_context(|| format!("Downloading azure://{}/{}", self.container, key))?;
 
-        let tmp_path = std::env::temp_dir()
-            .join(format!("{}_{}.tfstate", _workspace, Uuid::new_v4()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("{}_{}.tfstate", _workspace, Uuid::new_v4()));
         tokio::fs::write(&tmp_path, bytes).await?;
         Ok(tmp_path)
     }
     async fn list_workspaces(&self) -> Result<Vec<String>> {
         let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
             .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
-        let service = ClientBuilder::new_connection_string(&conn)?;
+
+        let cs = azure_storage::ConnectionString::new(&conn)?;
+        let credentials = cs.storage_credentials()?;
+        let account = cs
+            .account_name
+            .ok_or_else(|| anyhow::anyhow!("AccountName missing in connection string"))?;
+
+        let service = ClientBuilder::new(account, credentials);
         let container = service.container_client(&self.container);
 
         let mut builder = container.list_blobs();
@@ -272,14 +341,13 @@ impl StateSource for AzureStateSource {
         let mut out = Vec::new();
         while let Some(resp) = stream.next().await {
             let page = resp?;
-            for item in page.blobs.blobs() {
-                if let azure_storage_blobs::blob::responses::BlobItem::Blob(b) = item {
-                    if b.name.ends_with(".tfstate") {
-                        let trimmed = b.name.strip_prefix(prefix_str).unwrap_or(&b.name);
-                        if let Some(stem) = trimmed.strip_suffix(".tfstate") {
-                            let name = stem.trim_start_matches('/');
-                            out.push(name.to_string());
-                        }
+            for blob in page.blobs.blobs() {
+                // `blob` is of type `&azure_storage_blobs::container::operations::list_blobs::Blob`
+                if blob.name.ends_with(".tfstate") {
+                    let trimmed = blob.name.strip_prefix(prefix_str).unwrap_or(&blob.name);
+                    if let Some(stem) = trimmed.strip_suffix(".tfstate") {
+                        let name = stem.trim_start_matches('/');
+                        out.push(name.to_string());
                     }
                 }
             }
@@ -313,4 +381,4 @@ mod tests {
         assert!(list.contains(&"ws1".to_string()));
         assert!(list.contains(&"ws2".to_string()));
     }
-} 
+}
