@@ -13,3 +13,6 @@ build-static:
 
 man:
     cargo run -p terradrift --features man --bin gen-man -- terradrift.1 
+
+demo:
+    ./demo.sh 

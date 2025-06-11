@@ -1,5 +1,8 @@
 # Terradrift
 
+[![CI](https://github.com/yourorg/terradrift/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/terradrift/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](#)
+
 Terraform drift detection at ludicrous speed 🚀
 
 ## Features
@@ -38,6 +41,12 @@ terradrift diff -p prod -j 8
 3. Exit codes
 - `0` – no drift
 - `2` – drift detected (non-blocking in CI)
+
+## Demo (no cloud creds)
+```bash
+./demo.sh
+```
+This spins up a temporary directory with mock tfstate files, runs Terradrift, and shows summary JSON.
 
 ## Configuration Reference
 See [`terradrift.toml.example`](./terradrift.toml.example) for all supported keys.
