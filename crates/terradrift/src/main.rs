@@ -6,6 +6,7 @@ use anyhow::Context;
 use crate::config::Config;
 use tokio::runtime::Runtime;
 use crate::orchestrator::{run_profile, WorkspaceResult};
+use crate::sink::post_slack;
 
 /// Terradrift – Terraform drift detector
 #[derive(Parser, Debug)]
@@ -47,6 +48,7 @@ mod config;
 mod provider;
 mod terraform;
 mod orchestrator;
+mod sink;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -71,6 +73,20 @@ fn main() -> anyhow::Result<()> {
                     "results": results,
                 });
                 println!("{}", serde_json::to_string_pretty(&summary)?);
+
+                // Slack sink (optional)
+                if let Ok(webhook) = std::env::var("SLACK_WEBHOOK_URL") {
+                    let drift_count = results.iter().filter(|r| r.drift).count();
+                    if drift_count > 0 {
+                        let text = format!("🚨 Terradrift detected drift in {drift_count} workspace(s) for profile *{profile}*.");
+                        let _ = post_slack(&webhook, &text).await;
+                    }
+                }
+
+                // Exit code: 0 = no drift, 2 = drift detected
+                if results.iter().any(|r| r.drift) {
+                    std::process::exit(2);
+                }
             }
             Commands::Version { json } => {
                 if json {
