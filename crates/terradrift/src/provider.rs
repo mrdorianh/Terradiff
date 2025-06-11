@@ -17,9 +17,9 @@ use futures_util::StreamExt;
 use uuid::Uuid;
 
 #[cfg(feature = "azure")]
-use azure_storage::core::prelude::*;
+use azure_storage::prelude::*;
 #[cfg(feature = "azure")]
-use azure_sdk_storage_blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {

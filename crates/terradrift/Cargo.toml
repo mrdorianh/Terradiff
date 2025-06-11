@@ -30,7 +30,7 @@ default = ["mock"]
 mock = []
 s3 = ["aws-sdk-s3", "aws-config", "uuid"]
 gcs = ["cloud-storage", "uuid", "futures-util"]
-azure = ["azure_storage", "azure_sdk_storage_blob", "uuid"]
+azure = ["azure_storage", "azure_storage_blobs", "uuid", "futures-util"]
 
 [dependencies.aws-config]
 version = "1"
@@ -50,9 +50,9 @@ optional = true
 features = ["global-client"]
 
 [dependencies.azure_storage]
-version = "0.15"
+version = "0.21"
 optional = true
 
-[dependencies.azure_sdk_storage_blob]
-version = "0.15"
+[dependencies.azure_storage_blobs]
+version = "0.21"
 optional = true 
