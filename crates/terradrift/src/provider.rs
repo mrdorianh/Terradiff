@@ -20,6 +20,8 @@ use uuid::Uuid;
 use azure_storage::prelude::*;
 #[cfg(feature = "azure")]
 use azure_storage_blobs::prelude::*;
+#[cfg(feature = "azure")]
+use azure_storage::clients::ClientBuilder;
 
 #[async_trait]
 pub trait StateSource: Send + Sync {
@@ -225,9 +227,56 @@ struct AzureStateSource {
 #[async_trait]
 impl StateSource for AzureStateSource {
     async fn fetch_state(&self, _workspace: &str) -> Result<PathBuf> {
-        Err(anyhow::anyhow!("Azure provider not implemented yet"))
+        let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
+            .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
+
+        let service = ClientBuilder::new_connection_string(&conn)?;
+        let container = service.container_client(&self.container);
+
+        let key = match &self.prefix {
+            Some(p) => format!("{}/{}.tfstate", p.trim_end_matches('/'), _workspace),
+            None => format!("{}.tfstate", _workspace),
+        };
+
+        let blob = container.blob_client(&key);
+        let bytes = blob
+            .get_content()
+            .await
+            .with_context(|| format!("Downloading azure://{}/{}", self.container, key))?;
+
+        let tmp_path = std::env::temp_dir()
+            .join(format!("{}_{}.tfstate", _workspace, Uuid::new_v4()));
+        tokio::fs::write(&tmp_path, bytes).await?;
+        Ok(tmp_path)
     }
     async fn list_workspaces(&self) -> Result<Vec<String>> {
-        Err(anyhow::anyhow!("Azure provider not implemented yet"))
+        let conn = std::env::var("AZURE_STORAGE_CONNECTION_STRING")
+            .context("AZURE_STORAGE_CONNECTION_STRING env var not set for Azure provider")?;
+        let service = ClientBuilder::new_connection_string(&conn)?;
+        let container = service.container_client(&self.container);
+
+        let mut builder = container.list_blobs();
+        if let Some(ref p) = self.prefix {
+            builder = builder.prefix(p.clone());
+        }
+
+        let mut stream = Box::pin(builder.into_stream());
+        let prefix_str = self.prefix.as_deref().unwrap_or("");
+        let mut out = Vec::new();
+        while let Some(resp) = stream.next().await {
+            let page = resp?;
+            for item in page.blobs.blobs() {
+                if let azure_storage_blobs::blob::responses::BlobItem::Blob(b) = item {
+                    if b.name.ends_with(".tfstate") {
+                        let trimmed = b.name.strip_prefix(prefix_str).unwrap_or(&b.name);
+                        if let Some(stem) = trimmed.strip_suffix(".tfstate") {
+                            let name = stem.trim_start_matches('/');
+                            out.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
     }
 } 
