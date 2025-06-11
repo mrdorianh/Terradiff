@@ -1,0 +1,77 @@
+[package]
+name = "terradrift"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+toml = { workspace = true }
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+zip = { workspace = true }
+num_cpus = { workspace = true }
+tokio-stream = "0.1"
+futures = "0.3"
+uuid = { version = "1", features = ["v4"], optional = true }
+tokio-util = { workspace = true }
+futures-util = { version = "0.3", optional = true }
+owo-colors = "3"
+tabled = { version = "0.15", features = ["derive"] }
+
+which = "4"
+dirs = "5"
+
+[features]
+default = ["mock"]
+mock = []
+s3 = ["aws-sdk-s3", "aws-config", "uuid"]
+gcs = ["cloud-storage", "uuid", "futures-util"]
+azure = ["azure_storage", "azure_storage_blobs", "uuid", "futures-util"]
+man = ["clap_mangen"]
+
+[dependencies.aws-config]
+version = "1"
+default-features = false
+optional = true
+features = ["rustls"]
+
+[dependencies.aws-sdk-s3]
+version = "1"
+default-features = false
+optional = true
+features = ["rustls"]
+
+[dependencies.cloud-storage]
+version = "0.11"
+optional = true
+features = ["global-client"]
+
+[dependencies.azure_storage]
+version = "0.21"
+optional = true
+
+[dependencies.azure_storage_blobs]
+version = "0.21"
+optional = true
+
+[dependencies.clap_mangen]
+version = "0.2"
+optional = true
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+assert_matches = "1"
+assert_cmd = "2"
+predicates = "3"
+
+[[bin]]
+name = "gen-man"
+path = "src/bin/gen_man.rs"
+required-features = ["man"] 

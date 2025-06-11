@@ -21,4 +21,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Nested runtime panic removed by switching to async BufReader.
 
+### Security
+- Static binary scanned via Trivy in CI.
+
 [0.1.0]: https://github.com/yourorg/terradrift/releases/tag/v0.1.0 

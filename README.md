@@ -5,6 +5,8 @@
 
 Terraform drift detection at ludicrous speed 🚀
 
+![CLI table screenshot](docs/table.png)
+
 ## Features
 - Ultra-fast parallel drift scans (100 workspaces < 60 s)
 - Provider-agnostic state back-ends via features: **s3**, **gcs**, **azure**

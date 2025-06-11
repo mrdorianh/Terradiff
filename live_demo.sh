@@ -31,7 +31,7 @@ if [[ ! -f "$CFG" ]]; then
 fi
 
 printf "\n👉 Running Terradrift diff for profile %s\n\n" "$TD_PROFILE"
-"$BIN" diff -p "$TD_PROFILE" --config "$CFG"
++RUSTFLAGS='-Awarnings' "$BIN" diff -p "$TD_PROFILE" --config "$CFG"
 EXIT=$?
 
 if [[ $EXIT -eq 0 ]]; then

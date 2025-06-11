@@ -41,6 +41,19 @@ jobs:
         with:
           name: terradrift-musl
           path: target/x86_64-unknown-linux-musl/release/terradrift
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          ignore-unfixed: true
+          format: "html"
+          output: "trivy-report.html"
+          input: "target/x86_64-unknown-linux-musl/release/terradrift"
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.html
       - name: Code coverage
         uses: actions-rs/tarpaulin@v0.1
         with:

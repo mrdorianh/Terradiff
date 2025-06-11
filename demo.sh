@@ -55,6 +55,6 @@ path = "$WORKDIR"
 TOML
 
 # Run scan – drift always simulated by stub, exit code 2 expected
-cargo run -q -p terradrift --bin terradrift -- diff -p demo --config terradrift.demo.toml || true
++RUSTFLAGS='-Awarnings' cargo run -q -p terradrift --bin terradrift -- diff -p demo --config terradrift.demo.toml || true
 
 echo "\nCleanup: $WORKDIR (left for inspection)" 
