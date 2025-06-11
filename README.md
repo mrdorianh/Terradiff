@@ -4,8 +4,9 @@
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](#)
 
 Terraform drift detection at ludicrous speed 🚀
-
+## Mocked demo
 ![CLI table screenshot – demo](docs/table-demo.png)
+## Live Demo
 ![CLI table screenshot – live](docs/table-live.png)
 
 ## Features
