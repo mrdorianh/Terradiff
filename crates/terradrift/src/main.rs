@@ -6,6 +6,9 @@ use terradrift::config::Config;
 use terradrift::orchestrator::run_profile;
 use terradrift::sink::post_slack;
 
+use tabled::{Table, Tabled};
+use tabled::settings::{Style, Modify, Alignment, Padding, object::{Columns, Rows}};
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -18,10 +21,47 @@ fn main() -> anyhow::Result<()> {
 
                 let results = run_profile(&profile, prof, jobs).await?;
 
-                // pretty print
-                for r in &results {
-                    println!("{:15} | drift: {:5} | changed: {:3} | {:4} ms", r.workspace, r.drift, r.changed_resources, r.duration_ms);
+                #[derive(Tabled)]
+                struct Row {
+                    #[tabled(rename = "workspace")]
+                    workspace: String,
+                    #[tabled(rename = "Δ")]
+                    drift: String,
+                    #[tabled(rename = "changed")] 
+                    changed: u64,
+                    #[tabled(rename = "ms")]
+                    duration: u128,
                 }
+
+                let rows: Vec<Row> = results
+                    .iter()
+                    .map(|r| Row {
+                        workspace: r.workspace.clone(),
+                        drift: if r.drift {
+                            "🚨".to_string()
+                        } else {
+                            "✅".to_string()
+                        },
+                        changed: r.changed_resources,
+                        duration: r.duration_ms,
+                    })
+                    .collect();
+
+                let mut table = Table::new(rows);
+                table
+                    .with(Style::modern())
+                    // Align numeric columns right
+                    .with(Modify::new(Columns::single(2)).with(Alignment::right()))
+                    .with(Modify::new(Columns::single(3)).with(Alignment::right()))
+                    // Workspace left-aligned
+                    .with(Modify::new(Columns::single(0)).with(Alignment::left()))
+                    // Center the icon column, no padding
+                    .with(Modify::new(Columns::single(1)).with(Alignment::center()))
+                    .with(Modify::new(Columns::single(1)).with(Padding::zero()))
+                    // Add one-space padding left/right to other columns for readability
+                    .with(Modify::new(Rows::new(0..)).with(Padding::new(1,1,0,0)));
+
+                println!("{}", table);
 
                 // emit summary json
                 let summary = serde_json::json!({

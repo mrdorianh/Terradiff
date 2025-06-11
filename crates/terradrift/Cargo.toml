@@ -21,6 +21,8 @@ futures = "0.3"
 uuid = { version = "1", features = ["v4"], optional = true }
 tokio-util = { workspace = true }
 futures-util = { version = "0.3", optional = true }
+owo-colors = "3"
+tabled = { version = "0.15", features = ["derive"] }
 
 which = "4"
 dirs = "5"
