@@ -19,3 +19,8 @@ demo:
 
 live:
     ./live_demo.sh 
+
+# Tag & push a signed release (usage: `just release v0.1.0-rc1`)
+release TAG:
+    git tag -s {{TAG}} -m "Terradrift {{TAG}}"
+    git push origin {{TAG}} 
