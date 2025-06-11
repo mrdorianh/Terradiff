@@ -67,7 +67,13 @@ jobs:
         run: cargo tarpaulin --workspace --ignore-tests --out Xml
 
       - name: Generate SBOM (cyclonedx)
-        run: cargo install cargo-cyclonedx --version ^0.5 && cargo cyclonedx --output sbom.xml
+        run: |
+          cargo install --locked cargo-cyclonedx --version ^0.5
+          # Generate SBOM in CycloneDX XML format. The tool writes the file next to the
+          # manifest (./crates/terradrift/sbom.xml). Use --override-filename to simplify
+          cargo cyclonedx -f xml --override-filename sbom
+          # Move the generated file to workspace root so later steps can find it
+          mv $(find . -maxdepth 3 -name sbom.xml | head -n 1) ./sbom.xml
       - name: Sign SBOM with cosign (optional)
         continue-on-error: true
         env:
