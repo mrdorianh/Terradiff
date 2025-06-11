@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: taiki-e/install-action@cargo-deny
+      - uses: taiki-e/install-action@just
+      - uses: taiki-e/install-action@cross
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Lint
+        run: just lint
+      - name: Unit tests
+        run: just test
+      - name: Security audit
+        run: cargo audit --color always || true
+      - name: Build static release (x86_64-musl)
+        run: just build-static
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: terradrift-musl
+          path: target/x86_64-unknown-linux-musl/release/terradrift
+      - name: Code coverage
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: latest
+          args: --workspace --ignore-tests
+      - name: Generate SBOM (cyclonedx)
+        run: cargo install cargo-cyclonedx --version ^0.5 && cargo cyclonedx --output sbom.xml
+      - name: Sign SBOM with cosign (optional)
+        continue-on-error: true
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          sha256sum sbom.xml | awk '{print $1}' > sbom.xml.sha256
+          cosign sign-blob --key env://COSIGN_KEY sbom.xml --output-signature sbom.xml.sig
+      - name: Upload coverage & SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            coverage/*.html
+            sbom.xml
+            sbom.xml.sig
+            sbom.xml.sha256 
