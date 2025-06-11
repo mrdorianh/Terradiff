@@ -1,0 +1,5 @@
+# terradrift.dev.toml – minimal dev profile using mock provider
+
+[profiles.dev.storage]
+provider = "mock"
+path = "./tests/fixtures/states" 

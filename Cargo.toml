@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/terradrift",
+]
+
+[workspace.package]
+authors = ["ZioSec <dev@ziosec.example>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[workspace.dependencies]
+# Workspace-wide dependency versions (kept in sync)
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "io-util"] }
+async-trait = "0.1"
+toml = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+sha2 = "0.10"
+zip = "0.6"
+which = "4"
+dirs = "5"
+num_cpus = "1"
+tokio-util = { version = "0.7", features = ["io-util"] } 
