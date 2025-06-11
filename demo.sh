@@ -25,6 +25,6 @@ path = "$WORKDIR"
 TOML
 
 # Run scan – expect exit code 2 due to drift.tfstate
-cargo run -q -p terradrift -- diff -p demo --config terradrift.demo.toml || true
+cargo run -q -p terradrift --bin terradrift -- diff -p demo --config terradrift.demo.toml || true
 
 echo "\nCleanup: $WORKDIR (left for inspection)" 
