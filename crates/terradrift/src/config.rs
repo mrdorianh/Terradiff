@@ -25,8 +25,10 @@ pub enum Storage {
     Mock { path: PathBuf },
     #[cfg(feature = "s3")]
     S3 { bucket: String, prefix: Option<String> },
-    // TODO: Gcs { bucket: String, prefix: Option<String> },
-    // TODO: Azure { container: String, prefix: Option<String> },
+    #[cfg(feature = "gcs")]
+    Gcs { bucket: String, prefix: Option<String> },
+    #[cfg(feature = "azure")]
+    Azure { container: String, prefix: Option<String> },
 }
 
 impl Config {

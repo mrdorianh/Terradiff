@@ -6,8 +6,8 @@ use std::time::Instant;
 use tokio::process::Command;
 use std::io::Read;
 use anyhow::Result;
-use tokio::io::{AsyncReadExt};
 use serde_json::{Value};
+use tokio_util::io::SyncIoBridge;
 
 const DEFAULT_TERRAFORM_VERSION: &str = "1.7.5";
 
@@ -116,33 +116,26 @@ pub async fn detect_drift_stub(bin: &Path) -> Result<DriftReport> {
 pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> {
     let start = Instant::now();
 
-    // Spawn terraform plan. For now we rely on exit code 0/2; capture JSON on stdout.
     let mut cmd = Command::new(bin);
     cmd.arg("plan")
         .arg("-detailed-exitcode")
         .arg("-input=false")
         .arg("-no-color")
         .arg("-refresh=true")
-        .arg("-json");
-
-    // If user supplied local state file path we inject env var so plan picks it up via backend override.
-    // Many backends ignore local -state flag, but this is acceptable for the initial implementation.
-    // We set TF_STATE environment variable for consistency with tests.
-    cmd.env("TF_STATE", state_path);
+        .arg("-json")
+        .env("TF_STATE", state_path);
 
     let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
-    let mut stdout = child.stdout.take().expect("child stdout");
+    let stdout = child.stdout.take().expect("child stdout");
 
-    // Read all bytes for now. TODO(zio): Replace with streaming parser to cap memory <150 MB.
-    let mut buf = Vec::new();
-    stdout.read_to_end(&mut buf).await?;
-
-    let status = child.wait().await?;
-
-    // Parse JSON plan (might be empty on errors)
+    // Bridge async stdout to blocking reader for serde_json
+    let mut reader = SyncIoBridge::new(stdout);
     let mut changed = 0u64;
-    if !buf.is_empty() {
-        if let Ok(v) = serde_json::from_slice::<Value>(&buf) {
+
+    {
+        let stream = serde_json::Deserializer::from_reader(&mut reader).into_iter::<Value>();
+        for value in stream {
+            let v = value?;
             if let Some(arr) = v.get("resource_changes").and_then(|v| v.as_array()) {
                 for rc in arr {
                     if let Some(actions) = rc
@@ -150,16 +143,23 @@ pub async fn detect_drift(bin: &Path, state_path: &Path) -> Result<DriftReport> 
                         .and_then(|c| c.get("actions"))
                         .and_then(|a| a.as_array())
                     {
-                        let only_noop = actions.len() == 1
-                            && actions[0].as_str().unwrap_or("") == "no-op";
+                        let only_noop = actions.len() == 1 && actions[0].as_str().unwrap_or("") == "no-op";
                         if !only_noop {
                             changed += 1;
+                            // Early terminate once we know drift exists
+                            if changed > 0 {
+                                let _ = child.kill().await;
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    // Await child exit if still running
+    let status = child.wait().await.unwrap_or_default();
 
     let tf_version = terraform_version(bin).await.unwrap_or_default();
 

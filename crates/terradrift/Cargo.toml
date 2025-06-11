@@ -19,6 +19,8 @@ num_cpus = { workspace = true }
 tokio-stream = "0.1"
 futures = "0.3"
 uuid = { version = "1", features = ["v4"], optional = true }
+tokio-util = { workspace = true }
+futures-util = { version = "0.3", optional = true }
 
 which = "4"
 dirs = "5"
@@ -27,6 +29,8 @@ dirs = "5"
 default = ["mock"]
 mock = []
 s3 = ["aws-sdk-s3", "aws-config", "uuid"]
+gcs = ["cloud-storage", "uuid", "futures-util"]
+azure = ["azure_storage", "azure_sdk_storage_blob", "uuid"]
 
 [dependencies.aws-config]
 version = "1"
@@ -38,4 +42,17 @@ features = ["rustls"]
 version = "1"
 default-features = false
 optional = true
-features = ["rustls"] 
+features = ["rustls"]
+
+[dependencies.cloud-storage]
+version = "0.11"
+optional = true
+features = ["global-client"]
+
+[dependencies.azure_storage]
+version = "0.15"
+optional = true
+
+[dependencies.azure_sdk_storage_blob]
+version = "0.15"
+optional = true 

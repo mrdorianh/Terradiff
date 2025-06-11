@@ -9,6 +9,18 @@ use aws_sdk_s3::Client as S3Client;
 #[cfg(feature = "s3")]
 use aws_config::{self, BehaviorVersion};
 
+#[cfg(feature = "gcs")]
+use cloud_storage::{Object, ListRequest};
+#[cfg(feature = "gcs")]
+use futures_util::StreamExt;
+#[cfg(feature = "gcs")]
+use uuid::Uuid;
+
+#[cfg(feature = "azure")]
+use azure_storage::core::prelude::*;
+#[cfg(feature = "azure")]
+use azure_sdk_storage_blob::prelude::*;
+
 #[async_trait]
 pub trait StateSource: Send + Sync {
     async fn fetch_state(&self, workspace: &str) -> Result<PathBuf>;
@@ -22,10 +34,22 @@ pub fn source_from_storage(storage: &Storage) -> Result<Box<dyn StateSource>> {
         Storage::Mock { path } => Ok(Box::new(MockStateSource {
             root: path.clone(),
         })),
+        #[cfg(feature = "s3")]
         Storage::S3 { bucket, prefix } => Ok(Box::new(S3StateSource {
             bucket: bucket.clone(),
             prefix: prefix.clone(),
         })),
+        #[cfg(feature = "gcs")]
+        Storage::Gcs { bucket, prefix } => Ok(Box::new(GcsStateSource {
+            bucket: bucket.clone(),
+            prefix: prefix.clone(),
+        })),
+        #[cfg(feature = "azure")]
+        Storage::Azure { container, prefix } => Ok(Box::new(AzureStateSource {
+            container: container.clone(),
+            prefix: prefix.clone(),
+        })),
+        #[cfg(not(any(feature = "s3", feature = "gcs", feature = "azure")))]
         _ => anyhow::bail!("Provider not yet implemented"),
     }
 }
@@ -138,5 +162,72 @@ impl StateSource for S3StateSource {
             }
         }
         Ok(out)
+    }
+}
+
+#[cfg(feature = "gcs")]
+struct GcsStateSource {
+    bucket: String,
+    prefix: Option<String>,
+}
+
+#[cfg(feature = "gcs")]
+#[async_trait]
+impl StateSource for GcsStateSource {
+    async fn fetch_state(&self, workspace: &str) -> Result<PathBuf> {
+        let obj_name = match &self.prefix {
+            Some(p) => format!("{}/{}.tfstate", p.trim_end_matches('/'), workspace),
+            None => format!("{}.tfstate", workspace),
+        };
+
+        let bytes = Object::download(&self.bucket, &obj_name)
+            .await
+            .with_context(|| format!("Downloading gs://{}/{}", self.bucket, obj_name))?;
+
+        let tmp_path = std::env::temp_dir()
+            .join(format!("{}_{}.tfstate", workspace, uuid::Uuid::new_v4()));
+        tokio::fs::write(&tmp_path, &bytes).await?;
+        Ok(tmp_path)
+    }
+
+    async fn list_workspaces(&self) -> Result<Vec<String>> {
+        let prefix = self.prefix.as_deref().unwrap_or("");
+        let req = ListRequest {
+            prefix: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
+            ..Default::default()
+        };
+        let mut stream = Box::pin(Object::list(&self.bucket, req).await?);
+
+        let mut out = Vec::new();
+        while let Some(list_res) = stream.next().await {
+            let list = list_res?;
+            for obj in list.items {
+                if obj.name.ends_with(".tfstate") {
+                    let name_part = obj.name.strip_prefix(prefix).unwrap_or(&obj.name);
+                    if let Some(stem) = name_part.strip_suffix(".tfstate") {
+                        let trimmed = stem.trim_start_matches('/');
+                        out.push(trimmed.to_string());
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+}
+
+#[cfg(feature = "azure")]
+struct AzureStateSource {
+    container: String,
+    prefix: Option<String>,
+}
+
+#[cfg(feature = "azure")]
+#[async_trait]
+impl StateSource for AzureStateSource {
+    async fn fetch_state(&self, _workspace: &str) -> Result<PathBuf> {
+        Err(anyhow::anyhow!("Azure provider not implemented yet"))
+    }
+    async fn list_workspaces(&self) -> Result<Vec<String>> {
+        Err(anyhow::anyhow!("Azure provider not implemented yet"))
     }
 } 
