@@ -86,5 +86,18 @@ Static release build (x86_64-musl):
 just build-static
 ```
 
+## Live demo
+To run against real states:
+```bash
+export TD_PROFILE=prod            # profile name in terradrift.toml
+export SLACK_WEBHOOK_URL=…        # optional
+export PLAN_URL=…                 # optional link in Slack alert
+
+just live     # or ./live_demo.sh
+```
+The script builds the release binary if needed, executes the drift scan, prints the JSON summary, sets the exit code, and posts to Slack when drift is detected.
+
 ## License
 MIT OR Apache-2.0
+
+For convenience, copy `env.example` to `.env` and tweak values, then `source .env`.

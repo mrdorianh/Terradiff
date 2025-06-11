@@ -16,3 +16,6 @@ man:
 
 demo:
     ./demo.sh 
+
+live:
+    ./live_demo.sh 
