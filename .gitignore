@@ -5,4 +5,4 @@ Cargo.lock
 .idea/
 .vscode/
 # Terradrift cache
-.cache/ 
+.cache/ terradrift.demo.toml
