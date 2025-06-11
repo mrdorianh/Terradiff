@@ -1,6 +1,6 @@
 # Terradrift
 
-[![CI](https://github.com/yourorg/terradrift/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/terradrift/actions/workflows/ci.yml)
+[![CI](https://github.com/mrdorianh/TerraDiff/actions/workflows/ci.yml/badge.svg)](https://github.com/mrdorianh/TerraDiff/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](#)
 
 Terraform drift detection at ludicrous speed 🚀
