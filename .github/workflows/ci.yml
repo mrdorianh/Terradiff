@@ -46,7 +46,10 @@ jobs:
         with:
           scan-type: "fs"
           ignore-unfixed: true
-          format: "html"
+          # Trivy no longer supports the legacy "html" format flag.
+          # Use "template" plus the built-in HTML template instead.
+          format: "template"
+          template: "@contrib/html.tpl"
           output: "trivy-report.html"
           input: "target/x86_64-unknown-linux-musl/release/terradrift"
       - name: Upload Trivy report
